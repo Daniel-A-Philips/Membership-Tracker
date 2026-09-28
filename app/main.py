@@ -15,7 +15,7 @@ from typing import Optional
 from fastapi import APIRouter, Depends, FastAPI, HTTPException
 from fastapi.responses import FileResponse, JSONResponse, Response
 from fastapi.security import HTTPBasic, HTTPBasicCredentials
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 DB_PATH = Path(os.getenv("DB_PATH", "./data/memberships.db"))
 APP_USER = os.getenv("APP_USER") or "admin"
@@ -24,7 +24,9 @@ STATIC_DIR = Path(__file__).parent / "static"
 
 CATEGORIES = ["airline", "hotel", "car rental", "rail", "club", "retail", "other"]
 FIELDS = ["person_id", "program", "category", "number", "tier", "alliance",
-          "expires", "url", "notes", "color", "pinned"]
+          "alliance_primary", "expires", "url", "notes", "color", "pinned"]
+# Canonical spellings; matching is case-insensitive and "none" means no alliance.
+ALLIANCES = {"star alliance": "Star Alliance", "oneworld": "oneworld", "skyteam": "SkyTeam"}
 COLOR_RE = re.compile(r"^#[0-9a-fA-F]{6}$")
 
 
@@ -72,6 +74,8 @@ def init_db() -> None:
         cols = {r["name"] for r in db.execute("PRAGMA table_info(memberships)")}
         if "person_id" not in cols:
             db.execute("ALTER TABLE memberships ADD COLUMN person_id INTEGER REFERENCES people(id)")
+        if "alliance_primary" not in cols:
+            db.execute("ALTER TABLE memberships ADD COLUMN alliance_primary INTEGER NOT NULL DEFAULT 0")
         # One-time migration: turn old free-text "holder" values into people.
         for (holder,) in db.execute(
             "SELECT DISTINCT holder FROM memberships WHERE person_id IS NULL AND holder != ''"
@@ -100,6 +104,7 @@ def row_to_dict(row: sqlite3.Row) -> dict:
     d = dict(row)
     d.pop("holder", None)
     d["pinned"] = bool(d["pinned"])
+    d["alliance_primary"] = bool(d.get("alliance_primary"))
     return d
 
 
@@ -126,6 +131,7 @@ class MembershipIn(BaseModel):
     number: str = Field(min_length=1, max_length=120)
     tier: str = Field("", max_length=80)
     alliance: str = Field("", max_length=80)
+    alliance_primary: bool = False
     expires: str = ""
     url: str = Field("", max_length=500)
     notes: str = Field("", max_length=2000)
@@ -144,6 +150,24 @@ class MembershipIn(BaseModel):
     def valid_category(cls, v: str) -> str:
         v = v.lower()
         return v if v in CATEGORIES else "other"
+
+    @field_validator("alliance")
+    @classmethod
+    def valid_alliance(cls, v: str) -> str:
+        key = " ".join(v.lower().split())
+        if key in ("", "none", "no alliance", "n/a"):
+            return ""
+        if key not in ALLIANCES:
+            raise ValueError("alliance must be Star Alliance, oneworld, SkyTeam, or empty")
+        return ALLIANCES[key]
+
+    @model_validator(mode="after")
+    def alliance_only_for_airlines(self):
+        if self.category != "airline":
+            self.alliance = ""
+        if not self.alliance:
+            self.alliance_primary = False
+        return self
 
     @field_validator("expires")
     @classmethod
@@ -172,6 +196,7 @@ class MembershipImport(MembershipIn):
     """Backup format: people are referenced by name so files move between installs."""
     person: str = Field("", max_length=80)
     holder: str = Field("", max_length=120)  # accepted from pre-people backups
+    primary: bool = False  # shorthand for alliance_primary in hand-made import files
 
 
 # ---------- auth ----------
@@ -233,6 +258,16 @@ def check_person(db: sqlite3.Connection, person_id: Optional[int]) -> None:
         raise HTTPException(400, "That person no longer exists. Pick someone else.")
 
 
+def enforce_single_primary(db: sqlite3.Connection, item_id: int, m: MembershipIn) -> None:
+    """A person has at most one primary program per alliance."""
+    if m.alliance_primary:
+        db.execute(
+            "UPDATE memberships SET alliance_primary=0 "
+            "WHERE person_id IS ? AND alliance=? AND id!=?",
+            (m.person_id, m.alliance, item_id),
+        )
+
+
 def insert(db: sqlite3.Connection, m: MembershipIn) -> int:
     data = m.model_dump(include=set(FIELDS))
     ts = now()
@@ -241,6 +276,7 @@ def insert(db: sqlite3.Connection, m: MembershipIn) -> int:
         f"VALUES ({', '.join('?' for _ in FIELDS)}, ?, ?)",
         [data[f] for f in FIELDS] + [ts, ts],
     )
+    enforce_single_primary(db, cur.lastrowid, m)
     return cur.lastrowid
 
 
@@ -265,6 +301,7 @@ def update_membership(item_id: int, m: MembershipIn):
         )
         if cur.rowcount == 0:
             raise HTTPException(404, "That membership no longer exists.")
+        enforce_single_primary(db, item_id, m)
         row = db.execute(MEMBERSHIP_SELECT + "WHERE m.id=?", (item_id,)).fetchone()
     return row_to_dict(row)
 
@@ -347,6 +384,7 @@ def import_memberships(payload: ImportPayload):
         for m in payload.memberships:
             name = (m.person or m.holder).strip()[:80]
             m.person_id = get_or_create_person(db, name) if name else None
+            m.alliance_primary = (m.alliance_primary or m.primary) and bool(m.alliance)
             insert(db, m)
     return {"imported": len(payload.memberships)}
 

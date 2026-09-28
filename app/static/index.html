@@ -90,6 +90,9 @@
   .meta a { color: inherit; }
   .meta .soon { color: var(--warn); font-weight: 600; }
   .meta .past { color: var(--stop); font-weight: 600; }
+  .badge { display: inline-block; font-size: .78rem; font-weight: 600; color: var(--go);
+           border: 1px solid currentColor; border-radius: 4px; padding: 0 6px; margin-top: 2px; }
+  .group h3.sub { font-size: .92rem; font-weight: 600; color: var(--muted); margin: 14px 0 8px; }
   .notes { font-size: .88rem; color: var(--muted); margin: 6px 0 0; white-space: pre-wrap; }
   .actions { display: flex; gap: 2px; margin: 6px 0 0 -8px; }
 
@@ -175,9 +178,16 @@
     <label>Tier or status
       <input name="tier" maxlength="80" placeholder="Gold">
     </label>
-    <label>Alliance or network
-      <input name="alliance" maxlength="80" list="alliance-list">
+    <label id="alliance-label">Alliance
+      <select name="alliance">
+        <option value="">None</option>
+        <option>Star Alliance</option>
+        <option>oneworld</option>
+        <option>SkyTeam</option>
+      </select>
     </label>
+    <label class="check full" id="primary-label"><input name="alliance_primary" type="checkbox">
+      <span id="primary-text">Primary program for this alliance</span></label>
     <label>Expires
       <input name="expires" type="date">
     </label>
@@ -213,15 +223,15 @@
   </div>
 </dialog>
 
-<datalist id="alliance-list">
-  <option value="Star Alliance"><option value="oneworld"><option value="SkyTeam">
-</datalist>
 <datalist id="program-list"></datalist>
 
 <div class="toast" id="toast" role="status"></div>
 
 <script>
 const CATEGORIES = ["airline", "hotel", "car rental", "rail", "club", "retail", "other"];
+const ALLIANCES = ["Star Alliance", "oneworld", "SkyTeam"];
+// Starting point for auto-filling alliance; your own saved airlines override it.
+const KNOWN_AIRLINES = {"Alaska Airlines": "oneworld", "American Airlines": "oneworld", "British Airways": "oneworld", "Cathay Pacific": "oneworld", "Fiji Airways": "oneworld", "Finnair": "oneworld", "Iberia": "oneworld", "Japan Airlines": "oneworld", "Malaysia Airlines": "oneworld", "Oman Air": "oneworld", "Philippine Airlines": "oneworld", "Qantas Airlines": "oneworld", "Qatar Airways": "oneworld", "Royal Air Maroc": "oneworld", "Royal Jordanian": "oneworld", "SriLankan Airlines": "oneworld", "Aerolineas Argentinas": "SkyTeam", "Aeromexico": "SkyTeam", "Air Europa": "SkyTeam", "Air France": "SkyTeam", "China Airlines": "SkyTeam", "China Eastern Airlines": "SkyTeam", "Delta Air Lines": "SkyTeam", "Garuda Indonesia": "SkyTeam", "Kenya Airways": "SkyTeam", "KLM Royal Dutch Airlines": "SkyTeam", "Korean Air": "SkyTeam", "Middle East Airlines": "SkyTeam", "SAS (Scandinavian Airlines)": "SkyTeam", "Saudia": "SkyTeam", "TAROM": "SkyTeam", "Vietnam Airlines": "SkyTeam", "Virgin Atlantic": "SkyTeam", "Xiamen Airlines": "SkyTeam", "Aegean Airlines": "Star Alliance", "Air Canada": "Star Alliance", "Air China": "Star Alliance", "Air India": "Star Alliance", "Air New Zealand": "Star Alliance", "All Nippon Airways (ANA)": "Star Alliance", "Asiana Airlines": "Star Alliance", "Austrian Airlines": "Star Alliance", "Avianca": "Star Alliance", "Brussels Airlines": "Star Alliance", "Copa Airlines": "Star Alliance", "Croatia Airlines": "Star Alliance", "EGYPTAIR": "Star Alliance", "Ethiopian Airlines": "Star Alliance", "EVA Air": "Star Alliance", "ITA Airways": "Star Alliance", "LOT Polish Airlines": "Star Alliance", "Lufthansa": "Star Alliance", "Shenzhen Airlines": "Star Alliance", "Singapore Airlines": "Star Alliance", "South African Airways": "Star Alliance", "SWISS": "Star Alliance", "TAP Air Portugal": "Star Alliance", "Thai Airways": "Star Alliance", "Turkish Airlines": "Star Alliance", "United Airlines": "Star Alliance", "ELAL": "", "Jetblue": ""};
 const $ = (s) => document.querySelector(s);
 const cap = (c) => c[0].toUpperCase() + c.slice(1);
 let items = [];
@@ -256,7 +266,11 @@ const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) =>
 
 function formatNumber(n) {
   const compact = n.replace(/\s+/g, "");
-  if (/^\d{8,}$/.test(compact)) return compact.match(/.{1,4}/g).map((p) => `<span>${p}</span>`).join("");
+  if (/^\d{8,}$/.test(compact)) {
+    // Group in 4s, or 3s when that divides evenly and 4s doesn't (e.g. 9 digits → 3 3 3)
+    const size = compact.length % 4 && !(compact.length % 3) ? 3 : 4;
+    return compact.match(new RegExp(`.{1,${size}}`, "g")).map((p) => `<span>${p}</span>`).join("");
+  }
   return esc(n);
 }
 
@@ -309,7 +323,7 @@ function matches(m) {
 
 function card(m) {
   const meta = [
-    m.alliance && `<span>${esc(m.alliance)}</span>`,
+    m.alliance && !m.alliance_primary && `<span>${esc(m.alliance)}</span>`,
     expiry(m.expires),
     m.url && `<a href="${esc(m.url)}" target="_blank" rel="noopener noreferrer">Open website</a>`,
   ].filter(Boolean).join("");
@@ -324,6 +338,7 @@ function card(m) {
         <button type="button" data-copy="${m.id}" aria-label="Copy ${esc(m.program)} number">Copy</button>
       </div>
       ${meta ? `<div class="meta">${meta}</div>` : ""}
+      ${m.alliance_primary ? `<span class="badge">Primary for ${esc(m.alliance)}</span>` : ""}
       ${m.notes ? `<p class="notes">${esc(m.notes)}</p>` : ""}
       <div class="actions">
         <button type="button" class="quiet" data-edit="${m.id}">Edit</button>
@@ -333,6 +348,13 @@ function card(m) {
 }
 
 const catOrder = (m) => CATEGORIES.indexOf(m.category);
+const allianceOrder = (m) => (m.alliance ? ALLIANCES.indexOf(m.alliance) : ALLIANCES.length);
+// category, then alliance, then primary first, then pinned, then name
+function cardSort(a, b) {
+  return catOrder(a) - catOrder(b) || allianceOrder(a) - allianceOrder(b) ||
+    b.alliance_primary - a.alliance_primary || b.pinned - a.pinned ||
+    a.program.localeCompare(b.program, undefined, { sensitivity: "base" });
+}
 const section = (title, list) =>
   `<section class="group"><h2>${esc(title)}</h2><div class="grid">${list.map(card).join("")}</div></section>`;
 
@@ -361,7 +383,8 @@ function render() {
 
   const pc = people.length;
   $("#count").textContent = `${items.length} ${items.length === 1 ? "membership" : "memberships"} for ${pc} ${pc === 1 ? "person" : "people"}`;
-  $("#program-list").innerHTML = [...new Set(items.map((m) => m.program))].map((p) => `<option value="${esc(p)}">`).join("");
+  $("#program-list").innerHTML = [...new Set([...items.map((m) => m.program), ...Object.keys(KNOWN_AIRLINES)])]
+    .map((p) => `<option value="${esc(p)}">`).join("");
 
   const list = $("#list");
   if (!items.length) {
@@ -383,7 +406,7 @@ function render() {
 
   if (person === "all") {
     // Everyone: one section per person, cards ordered by category
-    const sorted = (arr) => arr.slice().sort((a, b) => catOrder(a) - catOrder(b));
+    const sorted = (arr) => arr.slice().sort(cardSort);
     list.innerHTML =
       people.map((p) => {
         const g = shown.filter((m) => m.person_id === p.id);
@@ -393,8 +416,15 @@ function render() {
   } else {
     // One person: sections by category
     list.innerHTML = CATEGORIES.map((c) => {
-      const g = shown.filter((m) => m.category === c);
-      return g.length ? section(cap(c), g) : "";
+      const g = shown.filter((m) => m.category === c).sort(cardSort);
+      if (!g.length) return "";
+      if (c !== "airline") return section(cap(c), g);
+      // Airlines: one sub-group per alliance
+      const subs = [...ALLIANCES, ""].map((a) => {
+        const sg = g.filter((m) => m.alliance === a);
+        return sg.length ? `<h3 class="sub">${a || "No alliance"}</h3><div class="grid">${sg.map(card).join("")}</div>` : "";
+      }).join("");
+      return `<section class="group"><h2>Airlines</h2>${subs}</section>`;
     }).join("");
   }
 }
@@ -427,6 +457,32 @@ function toggleNewPerson() {
 }
 $("#person-select").addEventListener("change", toggleNewPerson);
 
+function knownAlliance(program) {
+  const key = program.trim().toLowerCase();
+  if (!key) return undefined;
+  const saved = items.find((m) => m.category === "airline" && m.program.toLowerCase() === key);
+  if (saved) return saved.alliance;
+  const k = Object.keys(KNOWN_AIRLINES).find((n) => n.toLowerCase() === key);
+  return k === undefined ? undefined : KNOWN_AIRLINES[k];
+}
+function syncAllianceFields() {
+  const isAirline = form.elements.category.value === "airline";
+  const alliance = form.elements.alliance.value;
+  $("#alliance-label").classList.toggle("hidden", !isAirline);
+  $("#primary-label").classList.toggle("hidden", !isAirline || !alliance);
+  $("#primary-text").textContent = `Primary ${alliance} program for this person`;
+}
+form.elements.category.addEventListener("change", syncAllianceFields);
+form.elements.alliance.addEventListener("change", () => { allianceTouched = true; syncAllianceFields(); });
+let allianceTouched = false;
+form.elements.program.addEventListener("input", () => {
+  const a = knownAlliance(form.elements.program.value);
+  if (a === undefined) return;
+  form.elements.category.value = "airline";
+  if (!allianceTouched) form.elements.alliance.value = a;
+  syncAllianceFields();
+});
+
 function openForm(m = null) {
   editingId = m ? m.id : null;
   form.reset();
@@ -442,6 +498,8 @@ function openForm(m = null) {
   const defaultPerson = m ? m.person_id : (typeof person === "number" ? person : person === "none" ? "" : null);
   fillPersonSelect(defaultPerson);
   if (m && m.person_id === null) $("#person-select").value = "";
+  allianceTouched = !!m;
+  syncAllianceFields();
   $("#dialog").showModal();
   form.elements.program.focus();
 }
@@ -450,6 +508,7 @@ form.addEventListener("submit", async (e) => {
   e.preventDefault();
   const body = Object.fromEntries(new FormData(form).entries());
   body.pinned = form.elements.pinned.checked;
+  body.alliance_primary = form.elements.alliance_primary.checked;
   if (!body.program.trim() || !body.number.trim()) {
     $("#form-error").textContent = "Program and membership number are required.";
     return;
