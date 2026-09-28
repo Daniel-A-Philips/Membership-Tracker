@@ -1,0 +1,598 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Memberships</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎫</text></svg>">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --paper: #EEF1F5;
+    --card: #FFFFFF;
+    --ink: #16233B;
+    --muted: #56637C;
+    --rule: #D3DAE4;
+    --go: #0E7C66;
+    --go-ink: #FFFFFF;
+    --warn: #9A5B06;
+    --stop: #B42318;
+    --sans: "Instrument Sans", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    --mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --paper: #0F1726; --card: #17223A; --ink: #E6ECF4; --muted: #9AA8BF;
+      --rule: #2A3853; --go: #2BB594; --go-ink: #06231C; --warn: #E3A33B; --stop: #F0766A;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--paper); color: var(--ink); font: 16px/1.5 var(--sans); }
+  .wrap { max-width: 1100px; margin: 0 auto; padding-left: 20px; padding-right: 20px; }
+
+  header { padding-top: 36px; padding-bottom: 8px; display: flex; flex-wrap: wrap; gap: 16px;
+           align-items: flex-end; justify-content: space-between; }
+  h1 { font-size: 2.25rem; line-height: 1.05; margin: 0; font-weight: 700; letter-spacing: -0.015em; }
+  .count { color: var(--muted); margin: 6px 0 0; font-size: .95rem; }
+  .tools { display: flex; gap: 10px; flex-wrap: wrap; }
+  @media (min-width: 640px) { .tools { flex-wrap: nowrap; } }
+
+  input, select, textarea {
+    font: inherit; color: var(--ink); background: var(--card);
+    border: 1px solid var(--rule); border-radius: 6px; padding: 9px 11px;
+  }
+  input[type="search"] { width: min(300px, 100%); }
+  button {
+    font: inherit; cursor: pointer; color: var(--ink); background: var(--card);
+    border: 1px solid var(--rule); border-radius: 6px; padding: 9px 14px; white-space: nowrap;
+  }
+  button.primary { background: var(--go); border-color: var(--go); color: var(--go-ink); font-weight: 600; }
+  button.quiet { background: transparent; border-color: transparent; color: var(--muted); padding: 6px 8px; }
+  button.quiet:hover { color: var(--ink); }
+  button.danger { color: var(--stop); }
+  .quiet-link { color: var(--muted); text-decoration: none; padding: 6px 8px; border-radius: 6px; }
+  .quiet-link:hover { color: var(--ink); }
+  :focus-visible { outline: 3px solid var(--go); outline-offset: 2px; }
+
+  .people { display: flex; flex-wrap: wrap; align-items: center; gap: 0 22px; padding-top: 18px;
+            border-bottom: 1px solid var(--rule); }
+  .people button.tab { background: transparent; border: none; border-bottom: 3px solid transparent;
+                       border-radius: 0; padding: 8px 0 9px; margin-bottom: -1px; color: var(--muted); font-weight: 600; }
+  .people button.tab:hover { color: var(--ink); }
+  .people button.tab[aria-pressed="true"] { color: var(--ink); border-bottom-color: var(--go); }
+  .people .n { opacity: .6; margin-left: 5px; font-weight: 500; }
+  .people .manage { margin-left: auto; }
+  .filters { display: flex; gap: 6px; flex-wrap: wrap; padding-top: 14px; padding-bottom: 6px; }
+  .filters button { border-radius: 999px; padding: 5px 13px; font-size: .9rem; }
+  .filters button[aria-pressed="true"] { background: var(--ink); border-color: var(--ink); color: var(--paper); }
+  .filters .n { opacity: .65; margin-left: 4px; }
+
+  main { padding-bottom: 32px; }
+  .group h2 { font-size: 1.05rem; font-weight: 600; color: var(--muted); margin: 26px 0 10px; }
+  .group h2::first-letter { text-transform: uppercase; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(310px, 1fr)); gap: 12px; }
+
+  .card { position: relative; background: var(--card); border: 1px solid var(--rule);
+          border-radius: 10px; padding: 16px 14px 10px 24px; overflow: hidden; }
+  .card::before { content: ""; position: absolute; top: 0; bottom: 0; left: 0; width: 7px; background: var(--stripe); }
+  .top { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; }
+  .program { font-size: 1.05rem; font-weight: 600; margin: 0; }
+  .pin { color: var(--warn); margin-right: 4px; }
+  .tier { font-size: .85rem; color: var(--muted); text-align: right; }
+  .number { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin: 10px 0 6px; }
+  .number code { font-family: var(--mono); font-size: 1.5rem; font-weight: 600; letter-spacing: .03em;
+                 line-height: 1.2; overflow-wrap: anywhere; }
+  .number code span + span { margin-left: .4em; }
+  .number button { padding: 5px 11px; font-size: .88rem; flex-shrink: 0; }
+  .meta { display: flex; flex-wrap: wrap; gap: 2px 16px; font-size: .88rem; color: var(--muted); }
+  .meta a { color: inherit; }
+  .meta .soon { color: var(--warn); font-weight: 600; }
+  .meta .past { color: var(--stop); font-weight: 600; }
+  .notes { font-size: .88rem; color: var(--muted); margin: 6px 0 0; white-space: pre-wrap; }
+  .actions { display: flex; gap: 2px; margin: 6px 0 0 -8px; }
+
+  .empty { text-align: center; padding: 72px 20px; color: var(--muted); }
+  .empty p { margin: 0 0 16px; }
+
+  footer { display: flex; flex-wrap: wrap; gap: 8px; padding-bottom: 40px; border-top: 1px solid var(--rule); padding-top: 16px; }
+
+  dialog { border: none; border-radius: 12px; padding: 0; width: min(560px, 94vw);
+           background: var(--card); color: var(--ink); box-shadow: 0 24px 64px rgba(8, 16, 32, .35); }
+  dialog::backdrop { background: rgba(10, 18, 34, .55); }
+  form.edit { padding: 22px; display: grid; grid-template-columns: 1fr 1fr; gap: 12px 14px; }
+  form.edit h2 { grid-column: 1 / -1; margin: 0 0 2px; font-size: 1.3rem; }
+  label { display: grid; gap: 4px; font-size: .88rem; color: var(--muted); }
+  label.check { display: flex; align-items: center; gap: 8px; }
+  label input:not([type="checkbox"]), label select, label textarea { font-size: 1rem; width: 100%; }
+  input[type="color"] { height: 42px; padding: 3px; }
+  .full { grid-column: 1 / -1; }
+  .form-end { grid-column: 1 / -1; display: flex; justify-content: flex-end; gap: 10px; margin-top: 4px; }
+  .form-error { grid-column: 1 / -1; color: var(--stop); margin: 0; min-height: 0; }
+
+  .people-dialog { padding: 22px; display: grid; gap: 14px; }
+  .people-dialog h2 { margin: 0; font-size: 1.3rem; }
+  .people-dialog p { margin: 0; color: var(--muted); font-size: .92rem; }
+  #people-list { display: grid; gap: 12px; }
+  .person-row { display: grid; grid-template-columns: 1fr auto auto; gap: 8px; align-items: center; }
+  .person-row .sub { grid-column: 1 / -1; font-size: .82rem; color: var(--muted); margin-top: -4px; }
+  .add-row { display: grid; grid-template-columns: 1fr auto; gap: 8px; padding-top: 12px; border-top: 1px solid var(--rule); }
+  .hidden { display: none !important; }
+  .toast { position: fixed; left: 50%; bottom: 22px; transform: translate(-50%, 16px); opacity: 0;
+           background: var(--ink); color: var(--paper); padding: 10px 16px; border-radius: 8px;
+           transition: opacity .18s, transform .18s; pointer-events: none; }
+  .toast.show { opacity: 1; transform: translate(-50%, 0); }
+
+  @media (max-width: 560px) {
+    form.edit { grid-template-columns: 1fr; }
+    h1 { font-size: 1.9rem; }
+  }
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+</head>
+<body>
+<header class="wrap">
+  <div>
+    <h1>Memberships</h1>
+    <p class="count" id="count"></p>
+  </div>
+  <div class="tools">
+    <input type="search" id="search" placeholder="Search memberships" aria-label="Search memberships">
+    <button class="primary" id="add">Add membership</button>
+  </div>
+</header>
+
+<nav class="wrap people" id="people" aria-label="Choose whose memberships to show"></nav>
+<nav class="wrap filters" id="filters" aria-label="Filter by category"></nav>
+<main class="wrap" id="list" aria-live="polite"></main>
+
+<footer class="wrap">
+  <a class="quiet-link" href="/api/export.csv" download>Export spreadsheet (CSV)</a>
+  <a class="quiet-link" href="/api/export" download>Export backup</a>
+  <button type="button" class="quiet" id="import-btn">Import backup</button>
+  <input type="file" id="import-file" accept="application/json,.json" hidden>
+</footer>
+
+<dialog id="dialog">
+  <form class="edit" id="form" novalidate>
+    <h2 id="form-title">Add membership</h2>
+    <label class="full">Program
+      <input name="program" required maxlength="120" list="program-list">
+    </label>
+    <label>Category
+      <select name="category"></select>
+    </label>
+    <label>Membership number
+      <input name="number" required maxlength="120" autocomplete="off" spellcheck="false">
+    </label>
+    <label>Member
+      <select name="person_id" id="person-select"></select>
+    </label>
+    <label id="new-person-label" class="hidden">New person's name
+      <input id="new-person" maxlength="80" autocomplete="off">
+    </label>
+    <label>Tier or status
+      <input name="tier" maxlength="80" placeholder="Gold">
+    </label>
+    <label>Alliance or network
+      <input name="alliance" maxlength="80" list="alliance-list">
+    </label>
+    <label>Expires
+      <input name="expires" type="date">
+    </label>
+    <label class="full">Website
+      <input name="url" maxlength="500" placeholder="https://" inputmode="url">
+    </label>
+    <label class="full">Notes
+      <textarea name="notes" rows="3" maxlength="2000" placeholder="Security question hints, linked credit card, PIN location"></textarea>
+    </label>
+    <label>Card color
+      <input name="color" type="color" value="#16233B">
+    </label>
+    <label class="check"><input name="pinned" type="checkbox"> Pin to top</label>
+    <p class="form-error" id="form-error" role="alert"></p>
+    <div class="form-end">
+      <button type="button" id="cancel">Cancel</button>
+      <button type="submit" class="primary" id="save">Save membership</button>
+    </div>
+  </form>
+</dialog>
+
+<dialog id="people-dialog">
+  <div class="people-dialog">
+    <h2>People</h2>
+    <p>Everyone you keep membership numbers for. Deleting someone also deletes their memberships.</p>
+    <div id="people-list"></div>
+    <form class="add-row" id="add-person-form">
+      <input id="add-person-name" maxlength="80" placeholder="Name" aria-label="New person's name" autocomplete="off">
+      <button type="submit" class="primary">Add person</button>
+    </form>
+    <p class="form-error" id="people-error" role="alert"></p>
+    <div class="form-end"><button type="button" id="people-done">Done</button></div>
+  </div>
+</dialog>
+
+<datalist id="alliance-list">
+  <option value="Star Alliance"><option value="oneworld"><option value="SkyTeam">
+</datalist>
+<datalist id="program-list"></datalist>
+
+<div class="toast" id="toast" role="status"></div>
+
+<script>
+const CATEGORIES = ["airline", "hotel", "car rental", "rail", "club", "retail", "other"];
+const $ = (s) => document.querySelector(s);
+const cap = (c) => c[0].toUpperCase() + c.slice(1);
+let items = [];
+let people = [];
+let person = loadPref("person", "all");   // "all" | "none" | person id (number)
+let filter = "all";
+let query = "";
+let editingId = null;
+
+function loadPref(k, d) {
+  try { const v = localStorage.getItem("mt:" + k); return v === null ? d : JSON.parse(v); } catch { return d; }
+}
+function savePref(k, v) { try { localStorage.setItem("mt:" + k, JSON.stringify(v)); } catch {} }
+
+// ---------- helpers ----------
+async function api(path, opts = {}) {
+  const res = await fetch(path, { headers: { "Content-Type": "application/json" }, ...opts });
+  if (!res.ok) {
+    let msg = `Request failed with status ${res.status}.`;
+    try {
+      const body = await res.json();
+      if (typeof body.detail === "string") msg = body.detail;
+      else if (Array.isArray(body.detail)) msg = body.detail.map((d) => `${d.loc?.at(-1) ?? "field"}: ${d.msg}`).join("; ");
+    } catch {}
+    throw new Error(msg);
+  }
+  return res.status === 204 ? null : res.json();
+}
+
+const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) =>
+  ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+
+function formatNumber(n) {
+  const compact = n.replace(/\s+/g, "");
+  if (/^\d{8,}$/.test(compact)) return compact.match(/.{1,4}/g).map((p) => `<span>${p}</span>`).join("");
+  return esc(n);
+}
+
+function expiry(d) {
+  if (!d) return "";
+  const when = new Date(d + "T00:00:00");
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  const days = Math.round((when - today) / 86400000);
+  const txt = when.toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" });
+  if (days < 0) return `<span class="past">Expired ${txt}</span>`;
+  if (days <= 60) return `<span class="soon">Expires ${txt}</span>`;
+  return `<span>Expires ${txt}</span>`;
+}
+
+let toastTimer;
+function toast(msg) {
+  const t = $("#toast");
+  t.textContent = msg;
+  t.classList.add("show");
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.remove("show"), 2000);
+}
+
+async function copyText(text) {
+  // navigator.clipboard only works on https or localhost; fall back for plain-http LAN access.
+  if (navigator.clipboard && window.isSecureContext) {
+    await navigator.clipboard.writeText(text);
+    return;
+  }
+  const ta = document.createElement("textarea");
+  ta.value = text;
+  ta.style.position = "fixed"; ta.style.opacity = "0";
+  document.body.appendChild(ta);
+  ta.select();
+  document.execCommand("copy");
+  ta.remove();
+}
+
+const personName = (id) => people.find((p) => p.id === id)?.name ?? "Unassigned";
+const byPerson = (m) => person === "all" || (person === "none" ? m.person_id === null : m.person_id === person);
+
+// ---------- rendering ----------
+function matches(m) {
+  if (!byPerson(m)) return false;
+  if (filter !== "all" && m.category !== filter) return false;
+  if (!query) return true;
+  const hay = [m.program, m.number, m.person_name, m.tier, m.alliance, m.notes].join(" ").toLowerCase();
+  return query.split(/\s+/).every((q) => hay.includes(q) || hay.replace(/\s+/g, "").includes(q));
+}
+
+function card(m) {
+  const meta = [
+    m.alliance && `<span>${esc(m.alliance)}</span>`,
+    expiry(m.expires),
+    m.url && `<a href="${esc(m.url)}" target="_blank" rel="noopener noreferrer">Open website</a>`,
+  ].filter(Boolean).join("");
+  return `
+    <article class="card" style="--stripe:${esc(m.color)}">
+      <div class="top">
+        <h3 class="program">${m.pinned ? '<span class="pin" aria-label="Pinned">★</span>' : ""}${esc(m.program)}</h3>
+        ${m.tier ? `<span class="tier">${esc(m.tier)}</span>` : ""}
+      </div>
+      <div class="number">
+        <code>${formatNumber(m.number)}</code>
+        <button type="button" data-copy="${m.id}" aria-label="Copy ${esc(m.program)} number">Copy</button>
+      </div>
+      ${meta ? `<div class="meta">${meta}</div>` : ""}
+      ${m.notes ? `<p class="notes">${esc(m.notes)}</p>` : ""}
+      <div class="actions">
+        <button type="button" class="quiet" data-edit="${m.id}">Edit</button>
+        <button type="button" class="quiet danger" data-delete="${m.id}">Delete</button>
+      </div>
+    </article>`;
+}
+
+const catOrder = (m) => CATEGORIES.indexOf(m.category);
+const section = (title, list) =>
+  `<section class="group"><h2>${esc(title)}</h2><div class="grid">${list.map(card).join("")}</div></section>`;
+
+function renderPeopleNav() {
+  const unassigned = items.filter((m) => m.person_id === null).length;
+  if (person !== "all" && person !== "none" && !people.some((p) => p.id === person)) person = "all";
+  if (person === "none" && !unassigned) person = "all";
+  const tab = (key, label, n) =>
+    `<button type="button" class="tab" data-person="${key}" aria-pressed="${String(key) === String(person)}">${esc(label)}<span class="n">${n}</span></button>`;
+  $("#people").innerHTML =
+    tab("all", "Everyone", items.length) +
+    people.map((p) => tab(p.id, p.name, p.count)).join("") +
+    (unassigned ? tab("none", "Unassigned", unassigned) : "") +
+    `<button type="button" class="quiet manage" id="manage-people">Manage people</button>`;
+}
+
+function render() {
+  renderPeopleNav();
+  const scoped = items.filter(byPerson);
+  const counts = Object.fromEntries(CATEGORIES.map((c) => [c, scoped.filter((m) => m.category === c).length]));
+  if (filter !== "all" && !counts[filter]) filter = "all";
+  const chips = [["all", scoped.length], ...CATEGORIES.filter((c) => counts[c]).map((c) => [c, counts[c]])];
+  $("#filters").innerHTML = scoped.length > 1 ? chips.map(([c, n]) =>
+    `<button type="button" data-filter="${c}" aria-pressed="${c === filter}">${c === "all" ? "All" : cap(c)}<span class="n">${n}</span></button>`
+  ).join("") : "";
+
+  const pc = people.length;
+  $("#count").textContent = `${items.length} ${items.length === 1 ? "membership" : "memberships"} for ${pc} ${pc === 1 ? "person" : "people"}`;
+  $("#program-list").innerHTML = [...new Set(items.map((m) => m.program))].map((p) => `<option value="${esc(p)}">`).join("");
+
+  const list = $("#list");
+  if (!items.length) {
+    list.innerHTML = `<div class="empty"><p>No memberships yet. Add the people you keep numbers for, then add their loyalty and club numbers.</p>
+      <button type="button" data-action="people">Add people</button>
+      <button class="primary" type="button" data-action="add">Add membership</button></div>`;
+    return;
+  }
+  if (!scoped.length) {
+    list.innerHTML = `<div class="empty"><p>${esc(personName(person))} has no memberships yet.</p>
+      <button class="primary" type="button" data-action="add">Add membership for ${esc(personName(person))}</button></div>`;
+    return;
+  }
+  const shown = items.filter(matches);
+  if (!shown.length) {
+    list.innerHTML = `<div class="empty"><p>Nothing matches “${esc(query)}”. Try a program name, a person, or part of the number.</p></div>`;
+    return;
+  }
+
+  if (person === "all") {
+    // Everyone: one section per person, cards ordered by category
+    const sorted = (arr) => arr.slice().sort((a, b) => catOrder(a) - catOrder(b));
+    list.innerHTML =
+      people.map((p) => {
+        const g = shown.filter((m) => m.person_id === p.id);
+        return g.length ? section(p.name, sorted(g)) : "";
+      }).join("") +
+      (shown.some((m) => m.person_id === null) ? section("Unassigned", sorted(shown.filter((m) => m.person_id === null))) : "");
+  } else {
+    // One person: sections by category
+    list.innerHTML = CATEGORIES.map((c) => {
+      const g = shown.filter((m) => m.category === c);
+      return g.length ? section(cap(c), g) : "";
+    }).join("");
+  }
+}
+
+async function load() {
+  try {
+    [items, people] = await Promise.all([api("/api/memberships"), api("/api/people")]);
+    render();
+  } catch (e) {
+    $("#list").innerHTML = `<div class="empty"><p>Could not load memberships: ${esc(e.message)}</p></div>`;
+  }
+}
+
+// ---------- membership form ----------
+const form = $("#form");
+form.elements.category.innerHTML = CATEGORIES.map((c) => `<option value="${c}">${cap(c)}</option>`).join("");
+
+function fillPersonSelect(selected) {
+  const sel = $("#person-select");
+  sel.innerHTML =
+    people.map((p) => `<option value="${p.id}">${esc(p.name)}</option>`).join("") +
+    `<option value="">Unassigned</option><option value="__new">Add someone new…</option>`;
+  sel.value = selected === null || selected === undefined ? (people.length ? String(people[0].id) : "") : String(selected);
+  toggleNewPerson();
+}
+function toggleNewPerson() {
+  const isNew = $("#person-select").value === "__new";
+  $("#new-person-label").classList.toggle("hidden", !isNew);
+  if (isNew) $("#new-person").focus();
+}
+$("#person-select").addEventListener("change", toggleNewPerson);
+
+function openForm(m = null) {
+  editingId = m ? m.id : null;
+  form.reset();
+  $("#new-person").value = "";
+  $("#form-error").textContent = "";
+  $("#form-title").textContent = m ? "Edit membership" : "Add membership";
+  const data = m || { category: filter === "all" ? "airline" : filter, color: "#16233B" };
+  for (const el of form.elements) {
+    if (!el.name || el.name === "person_id" || !(el.name in data)) continue;
+    if (el.type === "checkbox") el.checked = !!data[el.name];
+    else el.value = data[el.name] ?? "";
+  }
+  const defaultPerson = m ? m.person_id : (typeof person === "number" ? person : person === "none" ? "" : null);
+  fillPersonSelect(defaultPerson);
+  if (m && m.person_id === null) $("#person-select").value = "";
+  $("#dialog").showModal();
+  form.elements.program.focus();
+}
+
+form.addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const body = Object.fromEntries(new FormData(form).entries());
+  body.pinned = form.elements.pinned.checked;
+  if (!body.program.trim() || !body.number.trim()) {
+    $("#form-error").textContent = "Program and membership number are required.";
+    return;
+  }
+  try {
+    if (body.person_id === "__new") {
+      const name = $("#new-person").value.trim();
+      if (!name) { $("#form-error").textContent = "Enter the new person's name."; return; }
+      const created = await api("/api/people", { method: "POST", body: JSON.stringify({ name }) });
+      body.person_id = created.id;
+    } else {
+      body.person_id = body.person_id ? Number(body.person_id) : null;
+    }
+    if (editingId) await api(`/api/memberships/${editingId}`, { method: "PUT", body: JSON.stringify(body) });
+    else await api("/api/memberships", { method: "POST", body: JSON.stringify(body) });
+    $("#dialog").close();
+    toast(editingId ? "Membership updated" : "Membership saved");
+    load();
+  } catch (err) {
+    $("#form-error").textContent = err.message;
+    load();
+  }
+});
+
+$("#cancel").addEventListener("click", () => $("#dialog").close());
+$("#add").addEventListener("click", () => openForm());
+
+// ---------- people dialog ----------
+function renderPeopleList() {
+  $("#people-list").innerHTML = people.length ? people.map((p) => `
+    <div class="person-row" data-row="${p.id}">
+      <input value="${esc(p.name)}" maxlength="80" aria-label="Name for ${esc(p.name)}">
+      <button type="button" data-rename="${p.id}">Rename</button>
+      <button type="button" class="quiet danger" data-remove="${p.id}">Delete</button>
+      <span class="sub">${p.count} ${p.count === 1 ? "membership" : "memberships"}</span>
+    </div>`).join("") : `<p>No people yet. Add yourself first.</p>`;
+}
+function openPeople() {
+  $("#people-error").textContent = "";
+  renderPeopleList();
+  $("#people-dialog").showModal();
+  $("#add-person-name").focus();
+}
+async function refreshPeople() {
+  await load();
+  renderPeopleList();
+}
+$("#add-person-form").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const name = $("#add-person-name").value.trim();
+  if (!name) return;
+  try {
+    await api("/api/people", { method: "POST", body: JSON.stringify({ name }) });
+    $("#add-person-name").value = "";
+    $("#people-error").textContent = "";
+    toast(`Added ${name}`);
+    refreshPeople();
+  } catch (err) { $("#people-error").textContent = err.message; }
+});
+$("#people-list").addEventListener("click", async (e) => {
+  const t = e.target.closest("button");
+  if (!t) return;
+  const id = Number(t.dataset.rename || t.dataset.remove);
+  const p = people.find((x) => x.id === id);
+  if (!p) return;
+  $("#people-error").textContent = "";
+  try {
+    if (t.dataset.rename) {
+      const name = t.closest(".person-row").querySelector("input").value.trim();
+      if (!name || name === p.name) return;
+      await api(`/api/people/${id}`, { method: "PUT", body: JSON.stringify({ name }) });
+      toast(`Renamed to ${name}`);
+    } else {
+      const what = p.count ? ` and their ${p.count} ${p.count === 1 ? "membership" : "memberships"}` : "";
+      if (!confirm(`Delete ${p.name}${what}? This can't be undone.`)) return;
+      await api(`/api/people/${id}`, { method: "DELETE" });
+      toast(`Deleted ${p.name}`);
+    }
+    refreshPeople();
+  } catch (err) { $("#people-error").textContent = err.message; }
+});
+$("#people-done").addEventListener("click", () => $("#people-dialog").close());
+
+// ---------- page actions ----------
+document.addEventListener("click", async (e) => {
+  const t = e.target.closest("button");
+  if (!t || t.closest("dialog")) return;
+  if (t.id === "manage-people" || t.dataset.action === "people") return openPeople();
+  if (t.dataset.action === "add") return openForm();
+  if (t.dataset.person) {
+    const v = t.dataset.person;
+    person = v === "all" || v === "none" ? v : Number(v);
+    savePref("person", person);
+    filter = "all";
+    render();
+    return;
+  }
+  if (t.dataset.filter) { filter = t.dataset.filter; render(); return; }
+  const id = Number(t.dataset.copy || t.dataset.edit || t.dataset.delete);
+  const m = items.find((x) => x.id === id);
+  if (!m) return;
+  if (t.dataset.copy) {
+    try { await copyText(m.number); toast(`Copied ${m.program} number`); }
+    catch { toast("Copy failed. Select the number and copy it manually."); }
+  } else if (t.dataset.edit) {
+    openForm(m);
+  } else if (t.dataset.delete) {
+    const who = m.person_name ? ` for ${m.person_name}` : "";
+    if (!confirm(`Delete ${m.program}${who}? This can't be undone.`)) return;
+    try { await api(`/api/memberships/${id}`, { method: "DELETE" }); toast("Membership deleted"); load(); }
+    catch (err) { toast(err.message); }
+  }
+});
+
+$("#search").addEventListener("input", (e) => { query = e.target.value.trim().toLowerCase(); render(); });
+document.addEventListener("keydown", (e) => {
+  if (e.key === "/" && !["INPUT", "TEXTAREA", "SELECT"].includes(document.activeElement.tagName)) {
+    e.preventDefault(); $("#search").focus();
+  }
+});
+
+// ---------- import ----------
+$("#import-btn").addEventListener("click", () => $("#import-file").click());
+$("#import-file").addEventListener("change", async (e) => {
+  const file = e.target.files[0];
+  e.target.value = "";
+  if (!file) return;
+  try {
+    const parsed = JSON.parse(await file.text());
+    const payload = Array.isArray(parsed) ? { memberships: parsed } : parsed;
+    if (!Array.isArray(payload.memberships)) throw new Error("File doesn't contain a memberships list.");
+    const res = await api("/api/import", {
+      method: "POST",
+      body: JSON.stringify({ people: payload.people || [], memberships: payload.memberships }),
+    });
+    toast(`Imported ${res.imported} memberships`);
+    load();
+  } catch (err) {
+    toast(`Import failed: ${err.message}`);
+  }
+});
+
+load();
+</script>
+</body>
+</html>

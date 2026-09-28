@@ -1,0 +1,18 @@
+services:
+  membership-tracker:
+    # Replace YOUR_GITHUB_USERNAME (must be lowercase)
+    image: ghcr.io/YOUR_GITHUB_USERNAME/membership-tracker:latest
+    build: .
+    container_name: membership-tracker
+    ports:
+      - "8765:8080"          # host:container — change 8765 if it's taken
+    environment:
+      TZ: America/New_York
+      APP_USER: ${APP_USER:-admin}
+      APP_PASSWORD: ${APP_PASSWORD:-}   # leave empty to disable login (LAN only!)
+    volumes:
+      - memberships-data:/data
+    restart: unless-stopped
+
+volumes:
+  memberships-data:
